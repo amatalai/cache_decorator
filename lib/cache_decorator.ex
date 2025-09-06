@@ -1,4 +1,159 @@
 defmodule CacheDecorator do
+  @moduledoc """
+  Provides a caching decorator mechanism for Elixir modules.
+
+  This module allows you to easily add caching behavior to functions by using
+  the `@cache` and `@invalidate` module attributes. It decorates functions to
+  automatically cache their results and invalidate cache entries.
+
+  ## Usage
+
+  Use `CacheDecorator` in your module and specify a `:cache_module` that
+  implements the caching backend behaviour.
+
+      use CacheDecorator, cache_module: YourCacheModule
+
+  Then decorate your functions with:
+
+  - `@cache key: "cache_key_template"`
+    - Caches the result of the function under the given key.
+    - The key can contain placeholders like `{arg_name}` that will be replaced
+      by the string representation of the corresponding function argument.
+    - Optionally provide additional options like `ttl` in the attribute.
+
+  - `@invalidate key: "cache_key_template", on: <pattern or list_of_patterns>`
+    - Invalidates the cache entry for the given key when the decorated function
+      is called.
+    - The `:on` option allows specifying one or multiple patterns to match
+      against the result of the function call; cache invalidation only occurs
+      if the result matches one of these patterns.
+    - If `:on` is omitted, cache invalidation happens after every call.
+
+  ## Behaviour callbacks you need to implement in your cache module
+
+  Your cache module (provided via `:cache_module` option) must implement the
+    following callbacks:
+
+        @callback get(decorator_opts :: Keyword.t(), key :: String.t()) ::
+          {:ok, nil} | {:ok, term()} | :error
+
+        @callback put(decorator_opts :: Keyword.t(), key :: String.t(), value :: term(), opts :: Keyword.t()) ::
+          :ok
+
+        @callback del(decorator_opts :: Keyword.t(), key :: String.t()) ::
+          :ok
+
+    Here:
+
+    - `decorator_opts` are the options passed to `use CacheDecorator` in your
+      module, such as the cache module and any other opts.
+
+    - In the `put/4` callback, the `opts` argument is the keyword list of options
+      provided in the `@cache` decorator, for example the `ttl` option.
+
+    This allows plugging any caching backend you want, by implementing these
+    functions.
+
+  ## Example
+
+      defmodule MyCache do
+        @behaviour CacheDecorator
+
+        def get(decorator_opts, key), do: ...
+        def put(decorator_opts, key, value, opts), do: ...
+        def del(decorator_opts, key), do: ...
+      end
+
+      defmodule MyModule do
+        use CacheDecorator, cache_module: MyCache
+
+        @cache key: "my_key_{arg1}"
+        def my_function(arg1), do: ... # automatically cached
+
+        @invalidate key: "my_key_{arg1}", on: :ok
+        def invalidate_my_key(arg1), do: ... # invalidates cache on :ok
+      end
+
+  Cache keys can reference function argument names wrapped in `{}` that will
+  be dynamically interpolated from the actual arguments on call.
+
+  If the cache is unavailable (e.g., backend error), the original function
+  will be called without caching as fallback.
+
+  This decorator uses Elixir's `@on_definition` and `@before_compile`
+  hooks, and generates override functions that implement caching and
+  invalidation transparently.
+
+  ## Examples of decorator translation
+
+  Here are examples showing how functions decorated with caching decorators
+  would look like without using the decorators.
+
+  ### Using `@cache`
+
+  Decorated function:
+
+      use CacheDecorator, cache_module: MyCache
+
+      @cache key: "prefix_{arg}"
+      def get(arg), do: expensive_computation(arg)
+
+  Equivalent function without decorator:
+
+      def get(arg) do
+        key = "prefix_\#{arg}"
+
+        case MyCache.get([], key) do
+          {:ok, nil} ->
+            value = expensive_computation(arg)
+            :ok = MyCache.put([], key, value, key: "prefix_{arg}")
+            value
+
+          {:ok, value} ->
+            value
+
+          :error ->
+            expensive_computation(arg)
+        end
+      end
+
+  ### Using `@invalidate`
+
+  Decorated function:
+
+      use CacheDecorator, cache_module: MyCache
+
+      @invalidate key: "prefix_{arg}", on: :ok
+      def update(arg), do: do_something(arg)
+
+  Equivalent function without decorator:
+
+      def update(arg) do
+        result = do_something(arg)
+
+        case result do
+          :ok ->
+            :ok = MyCache.del([], "prefix_\#{arg}")
+            result
+
+          _ ->
+            result
+        end
+      end
+
+  If the `:on` option is omitted, invalidation occurs unconditionally:
+
+      @invalidate key: "prefix_{arg}"
+      def update(arg), do: do_something(arg)
+
+  Equivalent without decorator:
+
+      def update(arg) do
+        result = do_something(arg)
+        :ok = MyCache.del([], "prefix_\#{arg}")
+        result
+      end
+  """
   @type decorator_opts :: Keyword.t()
   @type key :: String.t()
   @type value :: term()
