@@ -10,7 +10,7 @@ defmodule CacheDecorator.MixProject do
       description: "Caching decorator macros for Elixir functions",
       deps: deps(),
       docs: docs(),
-      elixir: "~> 1.18",
+      elixir: "~> 1.15",
       package: package(),
       start_permanent: Mix.env() == :prod,
       version: @version
