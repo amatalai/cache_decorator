@@ -1,6 +1,6 @@
 defmodule CacheDecorator do
   @moduledoc """
-  Provides a caching decorator mechanism for Elixir modules.
+  Provides a caching decorator mechanism for Elixir functions.
 
   This module allows you to easily add caching behavior to functions by using
   the `@cache` and `@invalidate` module attributes. It decorates functions to
