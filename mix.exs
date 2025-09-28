@@ -51,7 +51,7 @@ defmodule CacheDecorator.MixProject do
       {:cachex, "~> 4.1", only: :test},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:ex_doc, "~> 0.38", only: :dev, runtime: false},
-      {:mockery, "~> 2.3", only: :test}
+      {:mockery, "~> 2.3", only: [:dev, :test], runtime: false}
     ]
   end
 end
