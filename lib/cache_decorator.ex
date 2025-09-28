@@ -212,7 +212,7 @@ defmodule CacheDecorator do
       Module.make_overridable(env.module, [{name, length(args_ast)}])
 
       key_template = Keyword.fetch!(opts, :key)
-      key_ast = compile_key_ast!(key_template, args_ast, env.module, name, :cache)
+      key_ast = compile_key_ast!({key_template, args_ast, env.module, name, :cache})
 
       quote do
         def unquote(name)(unquote_splicing(args_ast)) do
@@ -245,7 +245,7 @@ defmodule CacheDecorator do
       Module.make_overridable(env.module, [{name, length(args)}])
 
       raw_key = Keyword.fetch!(opts, :key)
-      key_ast = compile_key_ast!(raw_key, args, env.module, name, :invalidate)
+      key_ast = compile_key_ast!({raw_key, args, env.module, name, :invalidate})
 
       invalidate_ast =
         quote do
@@ -298,8 +298,9 @@ defmodule CacheDecorator do
     List.flatten(patterns_ast ++ [unmatched_pattern_ast])
   end
 
-  defp compile_key_ast!(template, args_ast, env_module, fun_name, decorator_type)
-       when is_binary(template) do
+  defp compile_key_ast!({template, _, _, _, _} = args) when is_binary(template) do
+    {template, args_ast, env_module, fun_name, decorator_type} = args
+
     # Collect *all* bound var names from the function head (deep walk)
     {^args_ast, arg_ast_by_name} =
       Macro.prewalk(args_ast, %{}, fn
@@ -319,15 +320,7 @@ defmodule CacheDecorator do
         # If seg is exactly "{name}", treat it as a variable; otherwise literal.
         case Regex.run(~r/^\{([A-Za-z_][A-Za-z0-9_]*)\}$/u, seg) do
           [_, var] ->
-            case Map.fetch(arg_ast_by_name, var) do
-              {:ok, v_ast} ->
-                quote(do: to_string(unquote(v_ast)))
-
-              :error ->
-                raise ArgumentError,
-                      "#{inspect(__MODULE__)}: unknown variable {#{var}} in :key for " <>
-                        "@#{decorator_type} #{inspect(env_module)}.#{fun_name}/#{length(args_ast)}"
-            end
+            handle_var(var, arg_ast_by_name, args)
 
           nil ->
             quote(do: unquote(seg))
@@ -346,6 +339,20 @@ defmodule CacheDecorator do
         Enum.reduce(rest, first, fn seg, acc ->
           quote(do: unquote(acc) <> unquote(seg))
         end)
+    end
+  end
+
+  defp handle_var(var, arg_ast_by_name, args) do
+    {_template, args_ast, env_module, fun_name, decorator_type} = args
+
+    case Map.fetch(arg_ast_by_name, var) do
+      {:ok, v_ast} ->
+        quote(do: to_string(unquote(v_ast)))
+
+      :error ->
+        raise ArgumentError,
+              "#{inspect(__MODULE__)}: unknown variable {#{var}} in :key for " <>
+                "@#{decorator_type} #{inspect(env_module)}.#{fun_name}/#{length(args_ast)}"
     end
   end
 
