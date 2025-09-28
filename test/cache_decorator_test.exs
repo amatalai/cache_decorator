@@ -78,8 +78,8 @@ defmodule CacheDecoratorTest do
       assert ^value = Example.cache_without_ttl(value)
       assert ^value = Example.cache_without_ttl(value)
 
-      assert_called(Cachex, :get, [@cache_name, ^cache_key], 2)
-      assert_called(Cachex, :put, [@cache_name, ^cache_key, ^value, []], 1)
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^value, []], times: 1
     end
   end
 
@@ -92,8 +92,8 @@ defmodule CacheDecoratorTest do
       assert ^value = Example.cache_with_ttl(value)
       assert ^value = Example.cache_with_ttl(value)
 
-      assert_called(Cachex, :get, [@cache_name, ^cache_key], 2)
-      assert_called(Cachex, :put, [@cache_name, ^cache_key, ^value, [ttl: ^ttl]], 1)
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^value, [ttl: ^ttl]], times: 1
     end
   end
 
@@ -108,8 +108,8 @@ defmodule CacheDecoratorTest do
       assert ^result = Example.cache_with_multiple_args(value1, value2)
       assert ^result = Example.cache_with_multiple_args(value1, value2)
 
-      assert_called(Cachex, :get, [@cache_name, ^cache_key], 2)
-      assert_called(Cachex, :put, [@cache_name, ^cache_key, ^result, []], 1)
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^result, []], times: 1
     end
   end
 
@@ -120,7 +120,7 @@ defmodule CacheDecoratorTest do
 
       assert ^value = Example.invalidate_without_on_pattern(value)
 
-      assert_called(Cachex, :del, [@cache_name, ^cache_key], 1)
+      assert_called! Cachex, :del, args: [@cache_name, ^cache_key], times: 1
     end
   end
 
@@ -131,7 +131,7 @@ defmodule CacheDecoratorTest do
 
       assert ^value = Example.invalidate_with_single_on_pattern(value)
 
-      assert_called(Cachex, :del, [@cache_name, ^cache_key], 1)
+      assert_called! Cachex, :del, args: [@cache_name, ^cache_key], times: 1
     end
 
     test "doesn't invalidate cache when :on pattern don't match" do
@@ -139,7 +139,7 @@ defmodule CacheDecoratorTest do
 
       assert ^value = Example.invalidate_with_single_on_pattern(value)
 
-      refute_called(Cachex, :del)
+      refute_called! Cachex, :del
     end
   end
 
@@ -150,7 +150,7 @@ defmodule CacheDecoratorTest do
 
       assert :ok = Example.invalidate_with_multiple_on_patterns(value, fn _ -> :ok end)
 
-      assert_called(Cachex, :del, [@cache_name, ^cache_key], 1)
+      assert_called! Cachex, :del, args: [@cache_name, ^cache_key], times: 1
     end
 
     test "invalidates cache when second :on pattern matches" do
@@ -160,7 +160,7 @@ defmodule CacheDecoratorTest do
       assert {:ok, ^value} =
                Example.invalidate_with_multiple_on_patterns(value, fn v -> {:ok, v} end)
 
-      assert_called(Cachex, :del, [@cache_name, ^cache_key], 1)
+      assert_called! Cachex, :del, args: [@cache_name, ^cache_key], times: 1
     end
 
     test "doesn't invalidate cache when :on pattern don't matches" do
@@ -169,7 +169,7 @@ defmodule CacheDecoratorTest do
       assert {:error, :reason} =
                Example.invalidate_with_multiple_on_patterns(value, fn _ -> {:error, :reason} end)
 
-      refute_called(Cachex, :del)
+      refute_called! Cachex, :del
     end
   end
 
@@ -183,7 +183,7 @@ defmodule CacheDecoratorTest do
 
       assert ^result = Example.invalidate_with_multiple_args(value1, value2)
 
-      assert_called(Cachex, :del, [@cache_name, ^cache_key], 1)
+      assert_called! Cachex, :del, args: [@cache_name, ^cache_key], times: 1
     end
   end
 
