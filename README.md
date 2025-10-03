@@ -11,7 +11,7 @@ Add the dependency to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:cache_decorator, "~> 0.1.0"}
+    {:cache_decorator, "~> 0.1.1"}
   ]
 end
 ```
