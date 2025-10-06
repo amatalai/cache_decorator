@@ -18,7 +18,7 @@ end
 
 ## Usage
 
-See [documentation](https://hexdocs.pm/cache_decorator/index.html) for usage examples
+See [documentation](https://hexdocs.pm/cache_decorator/CacheDecorator.html) for usage examples
 
 ## License
 
