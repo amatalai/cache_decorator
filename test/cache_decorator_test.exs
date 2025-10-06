@@ -57,6 +57,20 @@ defmodule CacheDecoratorTest do
     @cache key: "test_{value1}_{value2}"
     def cache_with_multiple_args(value1, value2), do: {value1, value2}
 
+    @cache key: "test_{value}", on: quote(do: {:ok, _result})
+    def cache_with_single_on_pattern(value, return) do
+      _ = value
+
+      return
+    end
+
+    @cache key: "test_{value}", on: [{:ok, 1}, {:ok, 2}]
+    def cache_with_multiple_on_patterns(value, return) do
+      _ = value
+
+      return
+    end
+
     @invalidate key: "test_{value}"
     def invalidate_without_on_pattern(value), do: value
 
@@ -98,7 +112,7 @@ defmodule CacheDecoratorTest do
   end
 
   describe "cache_with_multiple_args/1" do
-    test "cachess value" do
+    test "caches value" do
       value1 = random()
       value2 = random()
       cache_key = "test_#{value1}_#{value2}"
@@ -110,6 +124,70 @@ defmodule CacheDecoratorTest do
 
       assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
       assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^result, []], times: 1
+    end
+  end
+
+  describe "cache_with_single_on_pattern/1" do
+    test "caches value when on: pattern matches" do
+      value = random()
+      return = {:ok, value}
+      cache_key = "test_#{value}"
+
+      assert ^return = Example.cache_with_single_on_pattern(value, return)
+      assert ^return = Example.cache_with_single_on_pattern(value, return)
+
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^return, []], times: 1
+    end
+
+    test "doesn't cache when on: pattern doesn't match" do
+      value = random()
+      return = {:error, "reason"}
+      cache_key = "test_#{value}"
+
+      assert ^return = Example.cache_with_single_on_pattern(value, return)
+      assert ^return = Example.cache_with_single_on_pattern(value, return)
+
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      refute_called! Cachex, :put, args: [@cache_name, ^cache_key, ^return, []]
+    end
+  end
+
+  describe "cache_with_multiple_on_pattern/1" do
+    test "caches value when first on: pattern matches" do
+      value = random()
+      return = {:ok, 1}
+      cache_key = "test_#{value}"
+
+      assert ^return = Example.cache_with_multiple_on_patterns(value, return)
+      assert ^return = Example.cache_with_multiple_on_patterns(value, return)
+
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^return, []], times: 1
+    end
+
+    test "caches value when second on: pattern matches" do
+      value = random()
+      return = {:ok, 2}
+      cache_key = "test_#{value}"
+
+      assert ^return = Example.cache_with_multiple_on_patterns(value, return)
+      assert ^return = Example.cache_with_multiple_on_patterns(value, return)
+
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^return, []], times: 1
+    end
+
+    test "doesn't cache when on: pattern doesn't match" do
+      value = random()
+      return = {:ok, 3}
+      cache_key = "test_#{value}"
+
+      assert ^return = Example.cache_with_multiple_on_patterns(value, return)
+      assert ^return = Example.cache_with_multiple_on_patterns(value, return)
+
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      refute_called! Cachex, :put, args: [@cache_name, ^cache_key, ^return, []]
     end
   end
 

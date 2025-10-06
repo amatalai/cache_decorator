@@ -15,15 +15,21 @@ defmodule CacheDecorator do
 
   Then decorate your functions with:
 
-  - `@cache key: "cache_key_template"`
+  - `@cache key: "cache_key_template", on: <pattern or list_of_patterns>`
     - Caches the result of the function under the given key.
-    - The key can contain placeholders like `{arg_name}` that will be replaced
+    - The `:key` can contain placeholders like `{arg_name}` that will be replaced
       by the string representation of the corresponding function argument.
-    - Optionally provide additional options like `ttl` in the attribute.
+    - The `:on` option allows specifying one or multiple patterns to match
+      against the result of the function call; result will be cached only
+      if it matches one of these patterns.
+    - If `:on` is omitted, cache happens for any function call result.
+    - You can provide additional options like `ttl` which
+      will be passed to `cache_module.put/4` as `opts`
 
   - `@invalidate key: "cache_key_template", on: <pattern or list_of_patterns>`
-    - Invalidates the cache entry for the given key when the decorated function
-      is called.
+    - Invalidates the cache entry for the given key.
+    - The `:key` can contain placeholders like `{arg_name}` that will be replaced
+      by the string representation of the corresponding function argument.
     - The `:on` option allows specifying one or multiple patterns to match
       against the result of the function call; cache invalidation only occurs
       if the result matches one of these patterns.
@@ -211,8 +217,12 @@ defmodule CacheDecorator do
     for {name, args_ast, opts} <- specs do
       Module.make_overridable(env.module, [{name, length(args_ast)}])
 
-      key_template = Keyword.fetch!(opts, :key)
+      {internal_opts, opts} = Keyword.split(opts, [:key, :on])
+
+      key_template = Keyword.fetch!(internal_opts, :key)
       key_ast = compile_key_ast!({key_template, args_ast, env.module, name, :cache})
+
+      on_pattern = Keyword.get(internal_opts, :on, :no_on_pattern)
 
       quote do
         def unquote(name)(unquote_splicing(args_ast)) do
@@ -222,9 +232,7 @@ defmodule CacheDecorator do
             {:ok, nil} ->
               value = super(unquote_splicing(args_ast))
 
-              :ok = @cache_module.put(@cache_opts, key, value, unquote(opts))
-
-              value
+              unquote(put_cache(opts, on_pattern))
 
             {:ok, value} ->
               value
@@ -238,46 +246,68 @@ defmodule CacheDecorator do
     end
   end
 
+  defp put_cache(opts, :no_on_pattern) do
+    quote do
+      :ok = @cache_module.put(@cache_opts, key, value, unquote(opts))
+
+      value
+    end
+  end
+
+  defp put_cache(opts, on_pattern) do
+    cache_ast = put_cache(opts, :no_on_pattern)
+
+    quote do
+      case value do
+        unquote(compile_on_patterns_ast(on_pattern, cache_ast))
+      end
+    end
+  end
+
   defp handle_invalidations(env) do
     invalidations = Module.get_attribute(env.module, :invalidations) || []
 
-    for {name, args, opts} <- invalidations do
-      Module.make_overridable(env.module, [{name, length(args)}])
+    for {name, args_ast, opts} <- invalidations do
+      Module.make_overridable(env.module, [{name, length(args_ast)}])
 
-      raw_key = Keyword.fetch!(opts, :key)
-      key_ast = compile_key_ast!({raw_key, args, env.module, name, :invalidate})
+      {internal_opts, opts} = Keyword.split(opts, [:key, :on])
 
-      invalidate_ast =
-        quote do
-          :ok = @cache_module.del(@cache_opts, unquote(key_ast))
-        end
+      raw_key = Keyword.fetch!(internal_opts, :key)
+      key_ast = compile_key_ast!({raw_key, args_ast, env.module, name, :invalidate})
 
-      function_body_ast =
-        if on = Keyword.get(opts, :on) do
-          quote do
-            case super(unquote_splicing(args)) do
-              unquote(compile_on_patterns_ast(on, invalidate_ast))
-            end
-          end
-        else
-          quote do
-            result = super(unquote_splicing(args))
-
-            unquote(invalidate_ast)
-
-            result
-          end
-        end
+      on_pattern = Keyword.get(internal_opts, :on, :no_on_pattern)
 
       quote do
-        def unquote(name)(unquote_splicing(args)) do
-          unquote(function_body_ast)
+        def unquote(name)(unquote_splicing(args_ast)) do
+          key = unquote(key_ast)
+
+          value = super(unquote_splicing(args_ast))
+
+          unquote(put_invalidation(opts, on_pattern))
         end
       end
     end
   end
 
-  defp compile_on_patterns_ast(on, invalidate_ast) do
+  defp put_invalidation(_opts, :no_on_pattern) do
+    quote do
+      :ok = @cache_module.del(@cache_opts, key)
+
+      value
+    end
+  end
+
+  defp put_invalidation(opts, on_pattern) do
+    invalidation_ast = put_invalidation(opts, :no_on_pattern)
+
+    quote do
+      case value do
+        unquote(compile_on_patterns_ast(on_pattern, invalidation_ast))
+      end
+    end
+  end
+
+  defp compile_on_patterns_ast(on, action_ast) do
     on = List.wrap(on)
 
     unmatched_pattern_ast =
@@ -288,10 +318,7 @@ defmodule CacheDecorator do
     patterns_ast =
       for pattern <- on do
         quote do
-          unquote(pattern) = result ->
-            unquote(invalidate_ast)
-
-            result
+          unquote(pattern) -> unquote(action_ast)
         end
       end
 
