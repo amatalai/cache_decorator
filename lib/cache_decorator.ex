@@ -61,23 +61,51 @@ defmodule CacheDecorator do
     functions.
 
   ## Example
+  Cache provider module implementing `CacheDecorator` behaviour (we use `:cachex` as example,
+  but it can be any cache implementation):
 
       defmodule MyCache do
         @behaviour CacheDecorator
 
-        def get(decorator_opts, key), do: ...
-        def put(decorator_opts, key, value, opts), do: ...
-        def del(decorator_opts, key), do: ...
+        def get(_decorator_opts, key) do
+          case Cachex.get(:default, key) do
+            {:ok, value} ->
+              {:ok, value}
+
+            {:error, _reason} ->
+              :error
+          end
+        end
+
+        def put(_decorator_opts, key, value, opts) do
+          expire = Keyword.get(opts, :ttl)
+
+          _ = Cachex.put(:default, key, value, expire: expire)
+
+          :ok
+        end
+
+        def del(_decorator_opts, key) do
+          _ = Cachex.del(:default, key)
+
+          :ok
+        end
       end
+
+    Module using cache decorators:
 
       defmodule MyModule do
         use CacheDecorator, cache_module: MyCache
 
-        @cache key: "my_key_{arg1}"
-        def my_function(arg1), do: ... # automatically cached
+        @cache key: "cache_key_{user_id}"
+        def get_data(user_id) do
+          Storage.get_by_user_id(user_id)
+        end
 
-        @invalidate key: "my_key_{arg1}", on: :ok
-        def invalidate_my_key(arg1), do: ... # invalidates cache on :ok
+        @invalidate key: "cache_key_{user_id}", on: :ok
+        def update_data(%{user_id: user_id} = params) do
+          Storage.update(user_id, params)
+        end
       end
 
   Cache keys can reference function argument names wrapped in `{}` that will

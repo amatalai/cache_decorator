@@ -27,10 +27,9 @@ defmodule CacheDecorator.MixProject do
     [
       extras: [
         "CHANGELOG.md",
-        "LICENSE",
-        "README.md"
+        "LICENSE"
       ],
-      main: "readme",
+      main: "CacheDecorator",
       source_url: @source_url,
       source_ref: @version,
       formatters: ["html"]
