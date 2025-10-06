@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 ()
+## 0.2.0 (2025-10-06)
 
 - Added `:on` option to `@cache` decorator — allows conditional caching based on the function result.
 
