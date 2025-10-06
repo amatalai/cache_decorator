@@ -49,13 +49,16 @@ defmodule CacheDecoratorTest do
     use CacheDecorator, cache_module: TestCache
 
     @cache key: "test_{value}"
-    def cache_without_ttl(value), do: value
+    def cache(value), do: value
 
     @cache key: "test_{value}", ttl: :timer.minutes(5)
-    def cache_with_ttl(value), do: value
+    def cache_with_opts(value), do: value
 
     @cache key: "test_{value1}_{value2}"
     def cache_with_multiple_args(value1, value2), do: {value1, value2}
+
+    @cache key: "test_{value}"
+    def cache_with_nested_key_arg(%{xyz: value}), do: value
 
     @cache key: "test_{value}", on: quote(do: {:ok, _result})
     def cache_with_single_on_pattern(value, return) do
@@ -84,27 +87,27 @@ defmodule CacheDecoratorTest do
     def invalidate_with_multiple_args(value1, value2), do: {value1, value2}
   end
 
-  describe "cache_without_ttl/1" do
+  describe "cache/1" do
     test "caches value" do
       value = random()
       cache_key = "test_#{value}"
 
-      assert ^value = Example.cache_without_ttl(value)
-      assert ^value = Example.cache_without_ttl(value)
+      assert ^value = Example.cache(value)
+      assert ^value = Example.cache(value)
 
       assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
       assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^value, []], times: 1
     end
   end
 
-  describe "cache_with_ttl/1" do
+  describe "cache_with_opts/1" do
     test "caches value" do
       value = random()
       cache_key = "test_#{value}"
       ttl = :timer.minutes(5)
 
-      assert ^value = Example.cache_with_ttl(value)
-      assert ^value = Example.cache_with_ttl(value)
+      assert ^value = Example.cache_with_opts(value)
+      assert ^value = Example.cache_with_opts(value)
 
       assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
       assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^value, [ttl: ^ttl]], times: 1
@@ -124,6 +127,19 @@ defmodule CacheDecoratorTest do
 
       assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
       assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^result, []], times: 1
+    end
+  end
+
+  describe "cache_with_nested_key_arg/1" do
+    test "caches value" do
+      value = random()
+      cache_key = "test_#{value}"
+
+      assert ^value = Example.cache_with_nested_key_arg(%{xyz: value})
+      assert ^value = Example.cache_with_nested_key_arg(%{xyz: value})
+
+      assert_called! Cachex, :get, args: [@cache_name, ^cache_key], times: 2
+      assert_called! Cachex, :put, args: [@cache_name, ^cache_key, ^value, []], times: 1
     end
   end
 

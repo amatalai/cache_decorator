@@ -16,43 +16,9 @@ def deps do
 end
 ```
 
-Then run:
-
-```bash
-mix deps.get
-```
-
 ## Usage
 
-Define a cache backend module implementing the `CacheDecorator` behaviour:
-
-```elixir
-defmodule MyCache do
-  @behaviour CacheDecorator
-
-  def get(_opts, key), do: # your cache get implementation
-  def put(_opts, key, value, _opts), do: # your cache put implementation
-  def del(_opts, key), do: # your cache delete implementation
-end
-```
-
-Use `CacheDecorator` in your module, specifying your cache module:
-
-```elixir
-defmodule MyModule do
-  use CacheDecorator, cache_module: MyCache
-
-  @cache key: "cache_key_{arg}"
-  def fetch_data(arg) do
-    # expensive computation
-  end
-
-  @invalidate key: "cache_key_{arg}", on: :ok
-  def update_data(arg) do
-    # update that invalidates cache on successful result :ok
-  end
-end
-```
+See [documentation](https://hexdocs.pm/cache_decorator/index.html) for usage examples
 
 ## License
 
